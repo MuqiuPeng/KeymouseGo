@@ -3,13 +3,12 @@ import sys
 import math
 from PySide6.QtWidgets import QApplication, QWidget, QSpinBox
 from PySide6.QtCore import Slot, QRect
-
-import UIFunc
 import argparse
 from Event import ScriptEvent
 from loguru import logger
-
 from assets.plugins.ProcessException import *  # noqa: F403
+import ScriptClipper
+import UIFunc
 
 
 def add_lib_path(libpaths):
@@ -34,13 +33,12 @@ def resize_layout(ui, ratio_w, ratio_h):
                                    q_widget.width() * ratio_w,
                                    q_widget.height() * ratio_h))
         q_widget.setStyleSheet('font-size: ' + str(
-                                math.ceil(9 * min(ratio_h, ratio_w))) + 'px')
+            math.ceil(9 * min(ratio_h, ratio_w))) + 'px')
         if isinstance(q_widget, QSpinBox):
             q_widget.setStyleSheet('padding-left: 7px')
 
 
 def main():
-
     app = QApplication(sys.argv)
     ui = UIFunc.UIFunc(app)
 
@@ -66,8 +64,8 @@ def single_run(script_path, run_times=1, speed=100, module_name='Extension'):
     try:
         for path in script_path:
             logger.info('Script path:%s' % path)
-            events, smodule_name, labeldict = UIFunc.RunScriptClass.parsescript(path, 
-                                                                     speed=speed)
+            events, smodule_name, labeldict = UIFunc.RunScriptClass.parsescript(path,
+                                                                                speed=speed)
             extension = UIFunc.RunScriptClass.getextension(
                 smodule_name if smodule_name is not None else module_name,
                 runtimes=run_times,
@@ -102,35 +100,70 @@ if __name__ == '__main__':
     logger.debug(sys.argv)
     if len(sys.argv) > 1:
         parser = argparse.ArgumentParser()
-        parser.add_argument('scripts',
-                            help='Path for the scripts',
-                            type=str,
-                            nargs='+'
-                            )
-        parser.add_argument('-rt', '--runtimes',
-                            help='Run times for the script',
-                            type=int,
-                            default=1
-                            )
-        parser.add_argument('-sp', '--speed',
-                            help='Run speed for the script, input in percentage form',
-                            type=int,
-                            default=100
-                            )
-        parser.add_argument('-m', '--module',
-                            help='Extension for the program',
-                            type=str,
-                            default='Extension'
-                            )
-        args = vars(parser.parse_args())
-        logger.debug(args)
-        if args['speed'] <= 0:
-            logger.warning('Unsupported speed')
-        else:
-            single_run(args['scripts'],
-                       run_times=args['runtimes'],
-                       speed=args['speed'],
-                       module_name=args['module']
-                       )
+        subparsers = parser.add_subparsers(help='select method')
+
+        parser_run = subparsers.add_parser('run', aliases=['r'], help='Run the script(s)')
+        parser_run.add_argument('to_run',
+                                help='Path for the scripts',
+                                type=str,
+                                nargs='+')
+        parser_run.add_argument('-rt', '--runtimes',
+                                help='Run times for the script',
+                                type=int,
+                                default=1)
+        parser_run.add_argument('-sp', '--speed',
+                                help='Run speed for the script, input in percentage form',
+                                type=int,
+                                default=100)
+        parser_run.add_argument('-m', '--module',
+                                help='Extension for the program',
+                                type=str,
+                                default='Extension')
+
+        parser_info = subparsers.add_parser('info', aliases=['i'], help='Get info of script(s)')
+        parser_info.add_argument('to_get_info',
+                                 help='Path for the scripts',
+                                 type=str,
+                                 nargs='+')
+
+        parser_concat = subparsers.add_parser('concat', aliases=['c'], help='Concat the scripts')
+        parser_concat.add_argument('to_concat',
+                                   help='Path for the scripts',
+                                   type=str,
+                                   nargs='+')
+
+        parser_slice = subparsers.add_parser('slice', aliases=['s'], help='Slice the script')
+        parser_slice.add_argument('to_slice',
+                                  help='Path for the script',
+                                  type=str)
+        parser_slice.add_argument('start_time',
+                                  help='Select the start time(ms)',
+                                  type=int,
+                                  nargs='?',
+                                  default=0)
+        parser_slice.add_argument('stop_time',
+                                  help='Select the start time(ms)',
+                                  type=int)
+
+        args = parser.parse_args()
+        if hasattr(args, 'to_run'):
+            args = vars(parser.parse_args())
+            logger.debug(args)
+            if args['speed'] <= 0:
+                logger.warning('Unsupported speed')
+            else:
+                single_run(args['to_run'],
+                           run_times=args['runtimes'],
+                           speed=args['speed'],
+                           module_name=args['module']
+                           )
+        elif hasattr(args, 'to_get_info'):
+            print(ScriptClipper.getScriptsInfo(args.to_get_info))
+        elif hasattr(args, 'to_concat'):
+            clipper = ScriptClipper.ScriptClipper()
+            clipper.concatScripts(args.to_concat)
+        elif hasattr(args, 'to_slice'):
+            clipper = ScriptClipper.ScriptClipper()
+            clipper.sliceScript(args.to_slice, args.start_time, args.stop_time)
     else:
         main()
